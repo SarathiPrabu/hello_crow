@@ -10,8 +10,3 @@ html, body {
     height: 100vh;
     width: 100vw;
 }
-
-img{
-    max-width: 100vw;
-    height: 80vh;
-}
