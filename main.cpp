@@ -1,4 +1,29 @@
 #include "crow_all.h"
+
+#include <fstream>
+#include <iostream>
+#include <vector>
+#include <cstdlib>
+#include <boost/filesystem.hpp>
+
+#include <bsoncxx/builder/stream/document.hpp>
+#include <bsoncxx/json.hpp>
+#include <bsoncxx/oid.hpp>
+
+#include <mongocxx/client.hpp>
+#include <mongocxx/stdx.hpp>
+#include <mongocxx/uri.hpp>
+#include <mongocxx/instance.hpp>
+
+using bsoncxx::builder::stream::close_array;
+using bsoncxx::builder::stream::close_document;
+using bsoncxx::builder::stream::document;
+using bsoncxx::builder::stream::finalize;
+using bsoncxx::builder::stream::open_array;
+using bsoncxx::builder::stream::open_document;
+using bsoncxx::builder::basic::kvp;
+using mongocxx::cursor;
+
 using namespace std;
 using namespace crow;
 
@@ -37,6 +62,18 @@ void sendScript(response &res, const string &filename) {
 int main(int argc, char* argv[]) {
   crow::SimpleApp app;
 
+  /*Mongo Connection*/
+  mongocxx::instance inst{};
+  const char* mongoConnect = getenv("MONGODB_URI");
+  if (!mongoConnect) {
+    cerr << "Error: MONGODB_URI environment variable is not set." << endl;
+    return 1;
+  }
+
+  mongocxx::client conn{mongocxx::uri{mongoConnect}};
+//  auto collection = conn["testdb"]["testcollection"];
+  auto collection = conn["Contacts_db"]["Contacts"];
+
   CROW_ROUTE(app, "/styles/<string>")
   ([](const request &req, response &res, const string &filename) ->void {
     sendStyle(res, filename);
@@ -62,6 +99,17 @@ int main(int argc, char* argv[]) {
     sendHtml(res, "about");
   });
 
+  CROW_ROUTE(app, "/contact")
+  ([&collection](){
+    mongocxx::options::find opts;
+    opts.limit(10);
+    auto docs = collection.find({}, opts);
+    std::ostringstream os;
+    for(auto doc : docs) {
+      os << bsoncxx::to_json(doc) << std::endl;
+    }
+    return crow::response(os.str());
+  });
   char* port = getenv("PORT");
   uint16_t iPort = static_cast<uint16_t>(port != NULL? stoi(port): 18080);
   cout << "PORT = " << iPort << "\n";
